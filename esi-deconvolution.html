@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ESI Mass Deconvolution Calculator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #ffffff;
+    color: #1e293b;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header h1 { font-size: 1.8rem; font-weight: 700; color: #1e40af; margin-bottom: 0.4rem; }
+  header p { color: #64748b; font-size: 0.9rem; }
+
+  .card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .card h2 {
+    font-size: 1rem; font-weight: 600; color: #1e40af;
+    margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;
+  }
+
+  /* Polarity toggle */
+  .polarity-row, .adduct-row, .calc-mode-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .polarity-row label, .adduct-row label, .calc-mode-row label {
+    font-size: 0.85rem; color: #64748b; font-weight: 500;
+  }
+
+  .polarity-toggle { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e1; }
+  .polarity-btn {
+    padding: 0.6rem 1.2rem; border: none; background: #ffffff;
+    color: #64748b; cursor: pointer; font-size: 0.85rem; font-weight: 500;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .polarity-btn.active-pos { background: #dc2626; color: white; }
+  .polarity-btn.active-neg { background: #2563eb; color: white; }
+  .polarity-btn + .polarity-btn { border-left: 1px solid #cbd5e1; }
+
+  .polarity-indicator {
+    font-size: 0.8rem; padding: 0.25rem 0.6rem; border-radius: 6px; font-weight: 600;
+  }
+  .polarity-indicator.pos { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+  .polarity-indicator.neg { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+
+  /* Calc mode toggle */
+  .calc-toggle { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e1; }
+  .calc-btn {
+    padding: 0.55rem 1rem; border: none; background: #ffffff;
+    color: #64748b; cursor: pointer; font-size: 0.82rem; font-weight: 500;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .calc-btn.active { background: #059669; color: white; }
+  .calc-btn + .calc-btn { border-left: 1px solid #cbd5e1; }
+
+  .calc-hint {
+    font-size: 0.78rem; color: #64748b; background: #f0fdf4;
+    border: 1px solid #bbf7d0; border-radius: 6px; padding: 0.5rem 0.75rem;
+    margin-bottom: 1rem; line-height: 1.5;
+  }
+  .calc-hint.manual-hint { background: #fefce8; border-color: #fde68a; }
+
+  /* Input section */
+  .input-mode { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .mode-btn {
+    padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #cbd5e1;
+    background: #ffffff; color: #64748b; cursor: pointer; font-size: 0.85rem;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    min-height: 40px;
+  }
+  .mode-btn.active { background: #2563eb; border-color: #2563eb; color: white; }
+
+  .peaks-container { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+
+  .peak-row { display: flex; align-items: center; gap: 0.5rem; }
+  .peak-row label { font-size: 0.8rem; color: #94a3b8; min-width: 55px; }
+  .peak-row input {
+    flex: 1; padding: 0.6rem 0.75rem; background: #f8fafc; border: 1px solid #cbd5e1;
+    border-radius: 8px; color: #1e293b; font-size: 16px;
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace; outline: none;
+    transition: border-color 0.2s; -webkit-appearance: none; appearance: none;
+  }
+  .peak-row input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .peak-row input.charge-input {
+    max-width: 70px; flex: none; text-align: center;
+    background: #fefce8; border-color: #fde68a;
+  }
+  .peak-row input.charge-input:focus { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.1); }
+  .peak-row .remove-btn {
+    width: 36px; height: 36px; min-width: 36px; border-radius: 6px; border: none;
+    background: #fee2e2; color: #dc2626; cursor: pointer; font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .peak-row .remove-btn:hover, .peak-row .remove-btn:active { background: #fecaca; }
+  .peak-row .z-label { font-size: 0.75rem; color: #f59e0b; font-weight: 600; min-width: 16px; }
+
+  .textarea-input {
+    width: 100%; min-height: 100px; padding: 0.75rem; background: #f8fafc;
+    border: 1px solid #cbd5e1; border-radius: 8px; color: #1e293b;
+    font-size: 0.9rem; font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+    resize: vertical; outline: none; margin-bottom: 0.5rem;
+  }
+  .textarea-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+  .hint { font-size: 0.78rem; color: #94a3b8; margin-bottom: 1rem; }
+
+  .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .btn {
+    padding: 0.65rem 1.2rem; border-radius: 8px; border: none;
+    font-size: 0.9rem; cursor: pointer; font-weight: 500; transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    min-height: 44px;
+  }
+  .btn-primary { background: #2563eb; color: white; }
+  .btn-primary:hover, .btn-primary:active { background: #1d4ed8; }
+  .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+  .btn-secondary:hover { background: #e2e8f0; }
+
+  .btn-add {
+    background: transparent; border: 1px dashed #cbd5e1; color: #94a3b8;
+    width: 100%; padding: 0.65rem; border-radius: 8px; cursor: pointer;
+    font-size: 0.85rem; margin-bottom: 1rem; transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation; min-height: 44px;
+  }
+  .btn-add:hover, .btn-add:active { border-color: #2563eb; color: #2563eb; }
+
+  .adduct-option {
+    padding: 0.5rem 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1;
+    background: #ffffff; color: #64748b; cursor: pointer; font-size: 0.82rem;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    min-height: 38px;
+  }
+  .adduct-option.active { background: #dbeafe; border-color: #2563eb; color: #1e40af; font-weight: 500; }
+
+  /* Results */
+  .result-box {
+    border-radius: 12px; padding: 1.5rem; text-align: center; margin-bottom: 1.5rem;
+  }
+  .result-box.pos-result { background: #fef2f2; border: 1px solid #fecaca; }
+  .result-box.neg-result { background: #eff6ff; border: 1px solid #bfdbfe; }
+  .result-box .label { font-size: 0.85rem; margin-bottom: 0.3rem; }
+  .result-box.pos-result .label { color: #991b1b; }
+  .result-box.neg-result .label { color: #1e40af; }
+  .result-box .mode-tag {
+    display: inline-block; font-size: 0.75rem; padding: 0.15rem 0.5rem;
+    border-radius: 4px; font-weight: 600; margin-bottom: 0.5rem;
+  }
+  .result-box.pos-result .mode-tag { background: #dc2626; color: white; }
+  .result-box.neg-result .mode-tag { background: #2563eb; color: white; }
+  .result-box .value {
+    font-size: 2.2rem; font-weight: 700;
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  }
+  .result-box.pos-result .value { color: #dc2626; }
+  .result-box.neg-result .value { color: #1d4ed8; }
+  .result-box .unit { font-size: 1rem; font-weight: 400; }
+  .result-box.pos-result .unit { color: #ef4444; }
+  .result-box.neg-result .unit { color: #3b82f6; }
+  .result-box .stdev { font-size: 0.85rem; color: #64748b; margin-top: 0.3rem; }
+
+  .smart-info {
+    font-size: 0.8rem; color: #059669; background: #f0fdf4; border: 1px solid #bbf7d0;
+    border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 1rem; line-height: 1.5;
+  }
+
+  .result-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .result-table th {
+    text-align: left; padding: 0.6rem 0.75rem; color: #1e40af;
+    font-weight: 600; border-bottom: 2px solid #e2e8f0; font-size: 0.82rem;
+  }
+  .result-table td {
+    padding: 0.55rem 0.75rem; border-bottom: 1px solid #f1f5f9;
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: 0.85rem;
+  }
+  .result-table tr:hover td { background: #f8fafc; }
+
+  .charge-badge {
+    display: inline-block; color: white; padding: 0.15rem 0.5rem;
+    border-radius: 4px; font-size: 0.78rem; font-weight: 600;
+  }
+  .charge-badge.pos { background: #dc2626; }
+  .charge-badge.neg { background: #2563eb; }
+
+  .error-badge { font-size: 0.75rem; color: #dc2626; }
+  .good-badge { font-size: 0.75rem; color: #16a34a; }
+
+  .chart-container { position: relative; width: 100%; height: 220px; margin-top: 1rem; }
+  canvas { width: 100%; height: 100%; }
+
+  .example-btn {
+    padding: 0.5rem 0.8rem; border-radius: 6px; border: 1px solid #cbd5e1;
+    background: #ffffff; color: #64748b; cursor: pointer; font-size: 0.8rem;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    min-height: 38px;
+  }
+  .example-btn:hover, .example-btn:active { border-color: #2563eb; color: #2563eb; }
+
+  .hidden { display: none; }
+
+  .formula-box {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 1rem; font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+    font-size: 0.85rem; color: #475569; line-height: 1.8; margin-top: 0.5rem;
+  }
+  .formula-box .highlight { color: #1d4ed8; font-weight: 600; }
+
+  .footer {
+    text-align: center; margin-top: 2rem; padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 0.78rem;
+  }
+
+  @media print {
+    body { background: #fff; }
+    .btn, .btn-add, .btn-row, .input-mode, .example-btn, .calc-mode-row, .calc-hint { display: none; }
+    .card { box-shadow: none; border: 1px solid #ddd; }
+  }
+  @media (max-width: 600px) {
+    .container { padding: 0.75rem; }
+    .card { padding: 1rem; }
+    .result-box .value { font-size: 1.6rem; }
+    header h1 { font-size: 1.4rem; }
+    header { margin-bottom: 1.5rem; }
+    .polarity-row, .adduct-row, .calc-mode-row { gap: 0.5rem; }
+    .btn-row { gap: 0.4rem; }
+    .peak-row { gap: 0.35rem; }
+    .peak-row label { min-width: 40px; font-size: 0.75rem; }
+    .result-table { font-size: 0.78rem; }
+    .result-table th, .result-table td { padding: 0.45rem 0.5rem; }
+    .formula-box { font-size: 0.78rem; padding: 0.75rem; }
+    .textarea-input { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>ESI Mass Deconvolution</h1>
+    <p>Electrospray Ionization multiply-charged ion series &rarr; original molecular weight</p>
+  </header>
+
+  <div class="card">
+    <h2>&#9881; Input m/z Peaks</h2>
+
+    <!-- Polarity -->
+    <div class="polarity-row">
+      <label>Ionization:</label>
+      <div class="polarity-toggle">
+        <button class="polarity-btn active-pos" id="pos-btn" onclick="setPolarity('positive')">&#43; Positive</button>
+        <button class="polarity-btn" id="neg-btn" onclick="setPolarity('negative')">&#8722; Negative</button>
+      </div>
+      <span class="polarity-indicator pos" id="polarity-label">[M + zH]<sup>z+</sup></span>
+    </div>
+
+    <!-- Adducts (positive) -->
+    <div class="adduct-row" id="adduct-row-pos">
+      <label>Adduct:</label>
+      <button class="adduct-option active" data-mass="1.00728" data-label="+H" onclick="setAdduct(this)">+H</button>
+      <button class="adduct-option" data-mass="22.9892" data-label="+Na" onclick="setAdduct(this)">+Na</button>
+      <button class="adduct-option" data-mass="18.034" data-label="+NH4" onclick="setAdduct(this)">+NH&#8324;</button>
+      <button class="adduct-option" data-mass="38.963" data-label="+K" onclick="setAdduct(this)">+K</button>
+    </div>
+    <!-- Adducts (negative) -->
+    <div class="adduct-row hidden" id="adduct-row-neg">
+      <label>Adduct:</label>
+      <button class="adduct-option active" data-mass="1.00728" data-label="-H" onclick="setAdduct(this)">&#8722;H</button>
+      <button class="adduct-option" data-mass="44.998" data-label="+CHO2" onclick="setAdduct(this)">+CHO&#8322;&#8315;</button>
+      <button class="adduct-option" data-mass="59.013" data-label="+C2H3O2" onclick="setAdduct(this)">+CH&#8323;COO&#8315;</button>
+      <button class="adduct-option" data-mass="34.969" data-label="+Cl" onclick="setAdduct(this)">+Cl&#8315;</button>
+    </div>
+
+    <!-- Calculation mode -->
+    <div class="calc-mode-row">
+      <label>Calc mode:</label>
+      <div class="calc-toggle">
+        <button class="calc-btn active" id="smart-btn" onclick="setCalcMode('smart')">&#9733; Smart (auto)</button>
+        <button class="calc-btn" id="manual-btn" onclick="setCalcMode('manual')">&#9998; Manual charge</button>
+      </div>
+    </div>
+
+    <div class="calc-hint" id="smart-hint">
+      <strong>Smart mode</strong>: 피크 간 charge 차이(&Delta;z = 1~10)를 자동 탐색하여 가장 일관된 분자량을 찾습니다. 연속/비연속 피크 모두 OK.
+    </div>
+    <div class="calc-hint manual-hint hidden" id="manual-hint">
+      <strong>Manual mode</strong>: 아는 피크 하나에 charge를 직접 입력하면 나머지를 자동 계산합니다. 모르는 피크는 z를 비워두세요.
+    </div>
+
+    <!-- Input mode -->
+    <div class="input-mode">
+      <button class="mode-btn active" onclick="switchInputMode('individual')">개별 입력</button>
+      <button class="mode-btn" onclick="switchInputMode('bulk')">일괄 입력</button>
+    </div>
+
+    <div id="individual-mode">
+      <div class="peaks-container" id="peaks-container"></div>
+      <button class="btn-add" onclick="addPeak()">+ 피크 추가</button>
+    </div>
+
+    <div id="bulk-mode" class="hidden">
+      <textarea class="textarea-input" id="bulk-input" placeholder="m/z 값을 한 줄에 하나씩&#10;예:&#10;857.5&#10;1000.8&#10;1143.6"></textarea>
+      <p class="hint">한 줄에 하나씩, 또는 콤마/공백으로 구분. Manual mode에서는 'mz,charge' 형식 가능 (예: 857.5,12)</p>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="calculate()">&#9889; Calculate</button>
+      <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+      <button class="example-btn" onclick="loadExample('protein_pos')">예시: Pos ~12kDa</button>
+      <button class="example-btn" onclick="loadExample('protein_neg')">예시: Neg ~12kDa</button>
+      <button class="example-btn" onclick="loadExample('sparse')">예시: 비연속 피크</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-section" class="hidden">
+    <div class="result-box pos-result" id="result-box">
+      <div class="mode-tag" id="result-mode-tag">Positive Mode</div>
+      <div class="label">Deconvoluted Molecular Weight (M)</div>
+      <div class="value" id="result-mass">&mdash;</div>
+      <div class="stdev" id="result-stdev"></div>
+    </div>
+
+    <div class="smart-info hidden" id="smart-info"></div>
+
+    <div class="card">
+      <h2>&#128202; Charge State Assignment</h2>
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>Observed m/z</th>
+            <th>Charge (z)</th>
+            <th>Calculated M</th>
+            <th>Error (Da)</th>
+          </tr>
+        </thead>
+        <tbody id="result-table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>&#128200; Spectrum View</h2>
+      <div class="chart-container">
+        <canvas id="spectrum-canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>&#128221; Calculation Method</h2>
+      <div class="formula-box" id="formula-display"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Reverse Calculator ═══ -->
+  <div class="card" style="border-color: #c4b5fd; margin-top: 2rem;">
+    <h2 style="color: #6d28d9;">&#128260; Reverse Calculator: M &rarr; m/z</h2>
+    <p style="font-size:0.82rem; color:#64748b; margin-bottom:1rem;">
+      분자량(M)을 입력하면 각 charge state에서 예상되는 m/z 값을 계산합니다.
+    </p>
+
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem; align-items:end;">
+      <div>
+        <label style="font-size:0.8rem; color:#64748b; display:block; margin-bottom:0.25rem;">Molecular Weight (Da)</label>
+        <input type="text" inputmode="decimal" id="rev-mass" placeholder="예: 10000"
+          style="padding:0.6rem 0.75rem; background:#f8fafc; border:1px solid #c4b5fd; border-radius:8px;
+          font-family:monospace; font-size:16px; color:#1e293b; width:180px; outline:none; -webkit-appearance:none;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();calcReverse();}">
+      </div>
+      <div>
+        <label style="font-size:0.8rem; color:#64748b; display:block; margin-bottom:0.25rem;">Charge range</label>
+        <div style="display:flex; gap:0.3rem; align-items:center;">
+          <input type="text" inputmode="numeric" id="rev-zmin" value="5"
+            style="padding:0.6rem; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px;
+            font-family:monospace; font-size:16px; width:60px; text-align:center; outline:none; -webkit-appearance:none;">
+          <span style="color:#94a3b8;">~</span>
+          <input type="text" inputmode="numeric" id="rev-zmax" value="25"
+            style="padding:0.6rem; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px;
+            font-family:monospace; font-size:16px; width:60px; text-align:center; outline:none; -webkit-appearance:none;">
+        </div>
+      </div>
+      <button class="btn" onclick="calcReverse()"
+        style="background:#7c3aed; color:white; min-height:44px; -webkit-tap-highlight-color:transparent; touch-action:manipulation;">&#128270; Calculate</button>
+    </div>
+
+    <div id="rev-results" class="hidden">
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>Charge (z)</th>
+            <th>Expected m/z</th>
+            <th>Ion notation</th>
+          </tr>
+        </thead>
+        <tbody id="rev-table-body"></tbody>
+      </table>
+      <div class="chart-container" style="margin-top:1rem;">
+        <canvas id="rev-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    ESI Mass Deconvolution Calculator &middot; Single-file HTML &middot; No installation required
+  </div>
+</div>
+
+<script>
+// ── State ──
+var peakCount = 0;
+var adductMass = 1.00728;
+var adductLabel = '+H';
+var inputMode = 'individual';
+var polarity = 'positive';
+var calcMode = 'smart'; // 'smart' or 'manual'
+
+// ── Examples ──
+var examples = {
+  protein_pos: { mode: 'positive', calcMode: 'smart', peaks: [
+    {mz:872.4}, {mz:908.9}, {mz:949.0}, {mz:993.1}, {mz:1041.7}, {mz:1096.0}, {mz:1157.3}, {mz:1227.5}
+  ]},
+  protein_neg: { mode: 'negative', calcMode: 'smart', peaks: [
+    {mz:870.4}, {mz:906.8}, {mz:946.9}, {mz:990.9}, {mz:1039.5}, {mz:1093.8}, {mz:1155.1}, {mz:1225.3}
+  ]},
+  sparse: { mode: 'positive', calcMode: 'smart', peaks: [
+    {mz:667.7}, {mz:715.4}, {mz:834.6}, {mz:1001.3}
+  ]}
+};
+
+// ── Polarity ──
+function setPolarity(mode) {
+  polarity = mode;
+  var posBtn = document.getElementById('pos-btn');
+  var negBtn = document.getElementById('neg-btn');
+  var label = document.getElementById('polarity-label');
+  posBtn.className = 'polarity-btn';
+  negBtn.className = 'polarity-btn';
+  if (mode === 'positive') {
+    posBtn.className = 'polarity-btn active-pos';
+    label.className = 'polarity-indicator pos';
+    label.innerHTML = '[M + zH]<sup>z+</sup>';
+    document.getElementById('adduct-row-pos').classList.remove('hidden');
+    document.getElementById('adduct-row-neg').classList.add('hidden');
+    adductMass = 1.00728; adductLabel = '+H';
+    resetAdductSelection(document.getElementById('adduct-row-pos'));
+  } else {
+    negBtn.className = 'polarity-btn active-neg';
+    label.className = 'polarity-indicator neg';
+    label.innerHTML = '[M &#8722; zH]<sup>z&#8722;</sup>';
+    document.getElementById('adduct-row-pos').classList.add('hidden');
+    document.getElementById('adduct-row-neg').classList.remove('hidden');
+    adductMass = 1.00728; adductLabel = '-H';
+    resetAdductSelection(document.getElementById('adduct-row-neg'));
+  }
+}
+
+function resetAdductSelection(container) {
+  var btns = container.querySelectorAll('.adduct-option');
+  btns.forEach(function(b, i) {
+    if (i === 0) {
+      b.classList.add('active');
+      adductMass = parseFloat(b.getAttribute('data-mass'));
+      adductLabel = b.getAttribute('data-label');
+    } else { b.classList.remove('active'); }
+  });
+}
+
+function setAdduct(btn) {
+  btn.parentElement.querySelectorAll('.adduct-option').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  adductMass = parseFloat(btn.getAttribute('data-mass'));
+  adductLabel = btn.getAttribute('data-label');
+}
+
+// ── Calc mode ──
+function setCalcMode(mode) {
+  calcMode = mode;
+  document.getElementById('smart-btn').className = 'calc-btn' + (mode === 'smart' ? ' active' : '');
+  document.getElementById('manual-btn').className = 'calc-btn' + (mode === 'manual' ? ' active' : '');
+  document.getElementById('smart-hint').classList.toggle('hidden', mode !== 'smart');
+  document.getElementById('manual-hint').classList.toggle('hidden', mode !== 'manual');
+  rebuildPeaks();
+}
+
+// ── Input mode ──
+function switchInputMode(mode) {
+  inputMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (mode === 'individual') {
+    document.querySelectorAll('.mode-btn')[0].classList.add('active');
+    document.getElementById('individual-mode').classList.remove('hidden');
+    document.getElementById('bulk-mode').classList.add('hidden');
+  } else {
+    document.querySelectorAll('.mode-btn')[1].classList.add('active');
+    document.getElementById('individual-mode').classList.add('hidden');
+    document.getElementById('bulk-mode').classList.remove('hidden');
+  }
+}
+
+// ── Peaks ──
+function addPeak(mzVal, zVal) {
+  peakCount++;
+  var container = document.getElementById('peaks-container');
+  var row = document.createElement('div');
+  row.className = 'peak-row';
+  var html =
+    '<label>Peak ' + peakCount + '</label>' +
+    '<input type="text" inputmode="decimal" class="mz-input" placeholder="m/z" value="' + (mzVal || '') + '" onkeydown="if(event.key===\'Enter\'){event.preventDefault();calculate();}">';
+  if (calcMode === 'manual') {
+    html += '<span class="z-label">z:</span>' +
+      '<input type="text" inputmode="numeric" class="charge-input" placeholder="z" value="' + (zVal || '') + '" onkeydown="if(event.key===\'Enter\'){event.preventDefault();calculate();}">';
+  }
+  html += '<button class="remove-btn" ontouchend="event.preventDefault();this.parentElement.remove();renumberPeaks();" onclick="this.parentElement.remove();renumberPeaks()">\u00d7</button>';
+  row.innerHTML = html;
+  container.appendChild(row);
+}
+
+function renumberPeaks() {
+  var rows = document.querySelectorAll('#peaks-container .peak-row');
+  rows.forEach(function(row, i) { row.querySelector('label').textContent = 'Peak ' + (i + 1); });
+  peakCount = rows.length;
+}
+
+function rebuildPeaks() {
+  // Save current values
+  var saved = [];
+  document.querySelectorAll('#peaks-container .peak-row').forEach(function(row) {
+    var mz = row.querySelector('.mz-input').value;
+    var zInp = row.querySelector('.charge-input');
+    saved.push({ mz: mz, z: zInp ? zInp.value : '' });
+  });
+  document.getElementById('peaks-container').innerHTML = '';
+  peakCount = 0;
+  if (saved.length === 0) { for (var i = 0; i < 4; i++) addPeak(); }
+  else { saved.forEach(function(s) { addPeak(s.mz, s.z); }); }
+}
+
+function getPeakData() {
+  var data = [];
+  if (inputMode === 'individual') {
+    document.querySelectorAll('#peaks-container .peak-row').forEach(function(row) {
+      var mz = parseFloat(row.querySelector('.mz-input').value);
+      var zInp = row.querySelector('.charge-input');
+      var z = zInp ? parseInt(zInp.value) : null;
+      if (!isNaN(mz) && mz > 0) data.push({ mz: mz, z: (isNaN(z) ? null : z) });
+    });
+  } else {
+    var text = document.getElementById('bulk-input').value;
+    text.split(/\n/).forEach(function(line) {
+      line = line.trim();
+      if (!line) return;
+      var parts = line.split(/[,\t]/);
+      var mz = parseFloat(parts[0]);
+      var z = parts.length > 1 ? parseInt(parts[1]) : null;
+      if (!isNaN(mz) && mz > 0) data.push({ mz: mz, z: (isNaN(z) ? null : z) });
+    });
+    // Also try space/semicolon split if no results
+    if (data.length === 0) {
+      text.split(/[\n,;\s]+/).forEach(function(p) {
+        var v = parseFloat(p.trim());
+        if (!isNaN(v) && v > 0) data.push({ mz: v, z: null });
+      });
+    }
+  }
+  data.sort(function(a, b) { return a.mz - b.mz; });
+  return data;
+}
+
+// ── Chemistry math ──
+function isDeprotonation() {
+  return polarity === 'negative' && adductLabel === '-H';
+}
+
+function calcM(mz, z) {
+  if (isDeprotonation()) return z * mz + z * adductMass;
+  else if (polarity === 'negative') return z * mz - z * adductMass;
+  else return z * (mz - adductMass);
+}
+
+function calcZ_for_M(M, mz) {
+  if (isDeprotonation()) return M / (mz + adductMass);
+  else return (M + adductMass * 1) / mz; // approximate, refine below
+}
+
+// For a pair with known delta-z
+function calcZ_pair(m1, m2, dz) {
+  var diff = m2 - m1;
+  if (diff <= 0) return null;
+  if (isDeprotonation()) return dz * (m1 + adductMass) / diff;
+  else return dz * (m1 - adductMass) / diff;
+}
+
+// ── Smart calculation ──
+function calculateSmart(peakData) {
+  var mzArr = peakData.map(function(p) { return p.mz; });
+  var n = mzArr.length;
+  if (n < 2) { alert('최소 2개 이상의 m/z 피크를 입력해주세요.'); return null; }
+
+  var bestScore = Infinity;
+  var bestResult = null;
+
+  // Try all pairs with delta_z from 1 to 10
+  for (var i = 0; i < n; i++) {
+    for (var j = i + 1; j < n; j++) {
+      for (var dz = 1; dz <= 10; dz++) {
+        var z_calc = calcZ_pair(mzArr[i], mzArr[j], dz);
+        if (z_calc === null || z_calc < 1) continue;
+        var z = Math.round(z_calc);
+        // Check if z_calc is close to integer
+        if (Math.abs(z_calc - z) > 0.3) continue;
+        var M_candidate = calcM(mzArr[i], z);
+        if (M_candidate <= 0) continue;
+
+        // Score: assign z to ALL peaks using this M, calculate total error
+        var assignments = [];
+        var totalErr = 0;
+        var valid = true;
+        for (var k = 0; k < n; k++) {
+          var zk_calc;
+          if (isDeprotonation()) zk_calc = M_candidate / (mzArr[k] + adductMass);
+          else zk_calc = (M_candidate + adductMass) / mzArr[k];
+
+          var zk = Math.round(zk_calc);
+          if (zk < 1 || Math.abs(zk_calc - zk) > 0.35) { valid = false; break; }
+          var Mk = calcM(mzArr[k], zk);
+          var err = Math.abs(Mk - M_candidate);
+          totalErr += err;
+          assignments.push({ mz: mzArr[k], z: zk, M: Mk, error: 0 });
+        }
+        if (!valid) continue;
+
+        var avgErr = totalErr / n;
+        if (avgErr < bestScore) {
+          bestScore = avgErr;
+          bestResult = { assignments: assignments, M: M_candidate, pairInfo: {i:i, j:j, dz:dz} };
+        }
+      }
+    }
+  }
+
+  if (!bestResult) {
+    alert('유효한 charge state 조합을 찾을 수 없습니다. m/z 값과 모드를 확인해주세요.');
+    return null;
+  }
+
+  // Recalculate final average M
+  var Ms = bestResult.assignments.map(function(a) { return a.M; });
+  var avgM = Ms.reduce(function(a,b) { return a+b; }, 0) / Ms.length;
+  var variance = Ms.reduce(function(s,v) { return s + (v-avgM)*(v-avgM); }, 0) / Ms.length;
+  var stdev = Math.sqrt(variance);
+  bestResult.assignments.forEach(function(a) { a.error = a.M - avgM; });
+
+  return { avgM: avgM, stdev: stdev, assignments: bestResult.assignments, pairInfo: bestResult.pairInfo };
+}
+
+// ── Manual calculation ──
+function calculateManual(peakData) {
+  // Find peaks with known z
+  var known = peakData.filter(function(p) { return p.z !== null && p.z > 0; });
+  var unknown = peakData.filter(function(p) { return p.z === null; });
+
+  if (known.length === 0) {
+    alert('Manual mode에서는 최소 1개 피크에 charge (z)를 입력해야 합니다.');
+    return null;
+  }
+
+  // Calculate M from known peaks
+  var knownMs = known.map(function(p) { return calcM(p.mz, p.z); });
+  var avgM = knownMs.reduce(function(a,b) { return a+b; }, 0) / knownMs.length;
+
+  // Assign z to unknown peaks
+  var assignments = [];
+  peakData.forEach(function(p) {
+    var z;
+    if (p.z !== null) {
+      z = p.z;
+    } else {
+      var zCalc;
+      if (isDeprotonation()) zCalc = avgM / (p.mz + adductMass);
+      else zCalc = (avgM + adductMass) / p.mz;
+      z = Math.round(zCalc);
+    }
+    var M = calcM(p.mz, z);
+    assignments.push({ mz: p.mz, z: z, M: M, error: 0, userSpecified: p.z !== null });
+  });
+
+  // Final average
+  var Ms = assignments.map(function(a) { return a.M; });
+  var finalAvgM = Ms.reduce(function(a,b) { return a+b; }, 0) / Ms.length;
+  var variance = Ms.reduce(function(s,v) { return s + (v-finalAvgM)*(v-finalAvgM); }, 0) / Ms.length;
+  var stdev = Math.sqrt(variance);
+  assignments.forEach(function(a) { a.error = a.M - finalAvgM; });
+
+  return { avgM: finalAvgM, stdev: stdev, assignments: assignments };
+}
+
+// ── Main calculate ──
+function calculate() {
+  var peakData = getPeakData();
+  var result;
+  if (calcMode === 'smart') {
+    result = calculateSmart(peakData);
+  } else {
+    result = calculateManual(peakData);
+  }
+  if (!result) return;
+  displayResults(result);
+}
+
+// ── Display ──
+function displayResults(result) {
+  var avgM = result.avgM;
+  var stdev = result.stdev;
+  var assignments = result.assignments;
+
+  document.getElementById('results-section').classList.remove('hidden');
+
+  var resultBox = document.getElementById('result-box');
+  var modeTag = document.getElementById('result-mode-tag');
+  if (polarity === 'positive') {
+    resultBox.className = 'result-box pos-result';
+    modeTag.textContent = 'Positive Mode (' + adductLabel + ')';
+  } else {
+    resultBox.className = 'result-box neg-result';
+    modeTag.textContent = 'Negative Mode (' + adductLabel + ')';
+  }
+
+  document.getElementById('result-mass').innerHTML = avgM.toFixed(2) + ' <span class="unit">Da</span>';
+  document.getElementById('result-stdev').textContent =
+    'SD: \u00b1 ' + stdev.toFixed(2) + ' Da  |  ' + assignments.length + ' charge states';
+
+  // Smart info
+  var smartInfo = document.getElementById('smart-info');
+  if (calcMode === 'smart' && result.pairInfo) {
+    var pi = result.pairInfo;
+    smartInfo.classList.remove('hidden');
+    smartInfo.innerHTML = '<strong>Smart detection</strong>: Peak ' + (pi.i+1) + ' &harr; Peak ' + (pi.j+1) +
+      ' 사이에서 &Delta;z = ' + pi.dz + ' 을 찾았습니다. charge range: ' +
+      Math.min.apply(null, assignments.map(function(a){return a.z;})) + '+ ~ ' +
+      Math.max.apply(null, assignments.map(function(a){return a.z;})) + '+';
+  } else {
+    smartInfo.classList.add('hidden');
+  }
+
+  // Table
+  var tbody = document.getElementById('result-table-body');
+  tbody.innerHTML = '';
+  var chargeSign = polarity === 'positive' ? '+' : '\u2212';
+  var badgeClass = polarity === 'positive' ? 'pos' : 'neg';
+
+  assignments.forEach(function(a) {
+    var absErr = Math.abs(a.error);
+    var errClass = absErr < 2 ? 'good-badge' : (absErr < 5 ? '' : 'error-badge');
+    var tr = document.createElement('tr');
+    var zText = a.z + chargeSign;
+    if (a.userSpecified) zText += ' *';
+    tr.innerHTML =
+      '<td>' + a.mz.toFixed(2) + '</td>' +
+      '<td><span class="charge-badge ' + badgeClass + '">' + zText + '</span></td>' +
+      '<td>' + a.M.toFixed(2) + '</td>' +
+      '<td class="' + errClass + '">' + (a.error >= 0 ? '+' : '') + a.error.toFixed(2) + '</td>';
+    tbody.appendChild(tr);
+  });
+
+  drawSpectrum(assignments);
+
+  // Formula
+  var fDiv = document.getElementById('formula-display');
+  var p1 = assignments[0];
+  var modeStr = polarity === 'positive' ? 'Positive' : 'Negative';
+  var calcStr = calcMode === 'smart' ? 'Smart auto-detection' : 'Manual charge assignment';
+  var formulaLine;
+  if (isDeprotonation()) {
+    formulaLine = 'M = z \u00d7 m/z + z \u00d7 ' + adductMass;
+  } else if (polarity === 'negative') {
+    formulaLine = 'M = z \u00d7 m/z \u2212 z \u00d7 ' + adductMass;
+  } else {
+    formulaLine = 'M = z \u00d7 (m/z \u2212 ' + adductMass + ')';
+  }
+
+  fDiv.innerHTML =
+    '<strong>' + modeStr + ' Mode (' + adductLabel + ') \u2014 ' + calcStr + '</strong><br><br>' +
+    formulaLine + '<br><br>' +
+    '예) m/z = <span class="highlight">' + p1.mz.toFixed(2) + '</span>, ' +
+    'z = <span class="highlight">' + p1.z + '</span> \u2192 ' +
+    'M = <span class="highlight">' + p1.M.toFixed(2) + ' Da</span><br><br>' +
+    '모든 피크의 평균: <span class="highlight">M = ' + avgM.toFixed(2) + ' \u00b1 ' + stdev.toFixed(2) + ' Da</span>';
+
+  document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function drawSpectrum(assignments) {
+  var canvas = document.getElementById('spectrum-canvas');
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.scale(dpr, dpr);
+
+  var W = rect.width, H = rect.height;
+  var pad = { top: 20, right: 30, bottom: 45, left: 50 };
+  var plotW = W - pad.left - pad.right;
+  var plotH = H - pad.top - pad.bottom;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  var mzs = assignments.map(function(a) { return a.mz; });
+  var minMz = Math.min.apply(null, mzs) * 0.95;
+  var maxMz = Math.max.apply(null, mzs) * 1.05;
+
+  function xS(mz) { return pad.left + (mz - minMz) / (maxMz - minMz) * plotW; }
+  function yS(v) { return pad.top + plotH - v * plotH; }
+
+  // Grid
+  ctx.strokeStyle = '#f1f5f9'; ctx.lineWidth = 1;
+  for (var g = 0.2; g <= 1.0; g += 0.2) {
+    ctx.beginPath(); ctx.moveTo(pad.left, yS(g)); ctx.lineTo(pad.left+plotW, yS(g)); ctx.stroke();
+  }
+  // Axes
+  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top+plotH);
+  ctx.lineTo(pad.left+plotW, pad.top+plotH); ctx.stroke();
+
+  ctx.fillStyle = '#94a3b8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('m/z', W / 2, H - 3);
+  ctx.save(); ctx.translate(12, pad.top + plotH/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('Relative', 0, 0); ctx.restore();
+
+  for (var i = 0; i <= 5; i++) {
+    var mz = minMz + (maxMz - minMz) * i / 5;
+    ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(mz.toFixed(0), xS(mz), pad.top + plotH + 18);
+  }
+
+  var peakColor = polarity === 'positive' ? '#dc2626' : '#2563eb';
+  var labelColor = polarity === 'positive' ? '#991b1b' : '#1e40af';
+  var csign = polarity === 'positive' ? '+' : '\u2212';
+  var midIdx = Math.floor(assignments.length / 2);
+
+  assignments.forEach(function(a) {
+    var x = xS(a.mz);
+    var h = 0.35 + 0.55 * Math.exp(-0.08 * Math.pow(a.z - assignments[midIdx].z, 2));
+    ctx.strokeStyle = peakColor; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x, yS(0)); ctx.lineTo(x, yS(h)); ctx.stroke();
+    ctx.fillStyle = peakColor; ctx.beginPath(); ctx.arc(x, yS(h), 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, yS(h), 2, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = labelColor; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(a.z + csign, x, yS(h) - 10);
+    ctx.fillStyle = '#94a3b8'; ctx.font = '9px monospace';
+    ctx.fillText(a.mz.toFixed(1), x, yS(0) + 30);
+  });
+}
+
+function loadExample(type) {
+  var ex = examples[type];
+  setPolarity(ex.mode);
+  setCalcMode(ex.calcMode || 'smart');
+  document.getElementById('peaks-container').innerHTML = '';
+  peakCount = 0;
+  switchInputMode('individual');
+  ex.peaks.forEach(function(p) { addPeak(p.mz, p.z || ''); });
+  calculate();
+}
+
+function clearAll() {
+  document.getElementById('peaks-container').innerHTML = '';
+  peakCount = 0;
+  for (var i = 0; i < 4; i++) addPeak();
+  document.getElementById('bulk-input').value = '';
+  document.getElementById('results-section').classList.add('hidden');
+}
+
+window.addEventListener('resize', function() {
+  if (!document.getElementById('results-section').classList.contains('hidden')) {
+    document.querySelector('.btn-primary').click();
+  }
+});
+
+// ── Reverse Calculator ──
+function calcReverse() {
+  var M = parseFloat(document.getElementById('rev-mass').value);
+  var zMin = parseInt(document.getElementById('rev-zmin').value) || 5;
+  var zMax = parseInt(document.getElementById('rev-zmax').value) || 25;
+  if (isNaN(M) || M <= 0) { alert('분자량을 입력해주세요.'); return; }
+  if (zMin > zMax) { var tmp = zMin; zMin = zMax; zMax = tmp; }
+
+  var rows = [];
+  for (var z = zMin; z <= zMax; z++) {
+    var mz;
+    var notation;
+    if (isDeprotonation()) {
+      mz = (M - z * adductMass) / z;
+      notation = '[M \u2212 ' + z + 'H]' + z + '\u2212';
+    } else if (polarity === 'negative') {
+      mz = (M + z * adductMass) / z;
+      notation = '[M + ' + z + '(' + adductLabel.replace(/^[+-]/, '') + ')]' + z + '\u2212';
+    } else {
+      mz = (M + z * adductMass) / z;
+      notation = '[M + ' + z + 'H]' + z + '+';
+    }
+    if (mz > 0) rows.push({ z: z, mz: mz, notation: notation });
+  }
+
+  document.getElementById('rev-results').classList.remove('hidden');
+
+  var tbody = document.getElementById('rev-table-body');
+  tbody.innerHTML = '';
+  var chargeSign = polarity === 'positive' ? '+' : '\u2212';
+  var badgeClass = polarity === 'positive' ? 'pos' : 'neg';
+
+  rows.forEach(function(r) {
+    var tr = document.createElement('tr');
+    // Highlight rows in typical ESI range (200-2500 m/z)
+    var inRange = r.mz >= 200 && r.mz <= 2500;
+    tr.innerHTML =
+      '<td><span class="charge-badge ' + badgeClass + '">' + r.z + chargeSign + '</span></td>' +
+      '<td style="' + (inRange ? 'font-weight:600;color:#1e293b;' : 'color:#94a3b8;') + '">' + r.mz.toFixed(2) + '</td>' +
+      '<td style="font-size:0.8rem;color:#64748b;">' + r.notation + '</td>';
+    tbody.appendChild(tr);
+  });
+
+  // Draw reverse spectrum
+  drawReverseSpectrum(rows);
+}
+
+function drawReverseSpectrum(rows) {
+  var canvas = document.getElementById('rev-canvas');
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.scale(dpr, dpr);
+
+  var W = rect.width, H = rect.height;
+  var pad = { top: 20, right: 30, bottom: 45, left: 50 };
+  var plotW = W - pad.left - pad.right;
+  var plotH = H - pad.top - pad.bottom;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  var mzs = rows.map(function(r) { return r.mz; });
+  var minMz = Math.min.apply(null, mzs) * 0.9;
+  var maxMz = Math.max.apply(null, mzs) * 1.1;
+
+  function xS(mz) { return pad.left + (mz - minMz) / (maxMz - minMz) * plotW; }
+  function yS(v) { return pad.top + plotH - v * plotH; }
+
+  // Grid
+  ctx.strokeStyle = '#f1f5f9'; ctx.lineWidth = 1;
+  for (var g = 0.2; g <= 1.0; g += 0.2) {
+    ctx.beginPath(); ctx.moveTo(pad.left, yS(g)); ctx.lineTo(pad.left+plotW, yS(g)); ctx.stroke();
+  }
+
+  // ESI range shading (200-2500)
+  var x200 = Math.max(pad.left, xS(200));
+  var x2500 = Math.min(pad.left + plotW, xS(2500));
+  if (x2500 > x200) {
+    ctx.fillStyle = 'rgba(139, 92, 246, 0.06)';
+    ctx.fillRect(x200, pad.top, x2500 - x200, plotH);
+    ctx.fillStyle = '#a78bfa';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Typical ESI range', (x200 + x2500) / 2, pad.top + 12);
+  }
+
+  // Axes
+  ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top+plotH);
+  ctx.lineTo(pad.left+plotW, pad.top+plotH); ctx.stroke();
+
+  ctx.fillStyle = '#94a3b8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('m/z', W / 2, H - 3);
+
+  for (var i = 0; i <= 5; i++) {
+    var mz = minMz + (maxMz - minMz) * i / 5;
+    ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(mz.toFixed(0), xS(mz), pad.top + plotH + 18);
+  }
+
+  var peakColor = '#7c3aed';
+  var midIdx = Math.floor(rows.length / 2);
+  var csign = polarity === 'positive' ? '+' : '\u2212';
+
+  rows.forEach(function(r) {
+    var x = xS(r.mz);
+    var inRange = r.mz >= 200 && r.mz <= 2500;
+    var h = 0.3 + 0.6 * Math.exp(-0.06 * Math.pow(r.z - rows[midIdx].z, 2));
+
+    ctx.strokeStyle = inRange ? peakColor : '#d4d4d8';
+    ctx.lineWidth = inRange ? 3 : 2;
+    ctx.beginPath(); ctx.moveTo(x, yS(0)); ctx.lineTo(x, yS(h)); ctx.stroke();
+
+    ctx.fillStyle = inRange ? peakColor : '#d4d4d8';
+    ctx.beginPath(); ctx.arc(x, yS(h), 3, 0, Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = inRange ? '#6d28d9' : '#a1a1aa';
+    ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(r.z + csign, x, yS(h) - 8);
+  });
+}
+
+// ── Mobile fixes ──
+// Prevent 300ms tap delay and double-tap zoom on buttons
+document.addEventListener('touchend', function(e) {
+  var t = e.target;
+  if (t.tagName === 'BUTTON' || t.closest('button')) {
+    // Don't prevent default on inputs
+    if (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') {
+      // Already handled by ontouchend on remove-btn, skip for those
+      if (!t.classList.contains('remove-btn')) {
+        // Trigger click immediately
+        e.preventDefault();
+        t.closest('button') ? t.closest('button').click() : t.click();
+      }
+    }
+  }
+}, { passive: false });
+
+// Prevent iOS zoom on input focus (font-size already 16px)
+// Prevent pull-to-refresh interfering
+document.body.style.overscrollBehavior = 'none';
+
+// Init
+(function() { for (var i = 0; i < 4; i++) addPeak(); })();
+</script>
+</body>
+</html>
